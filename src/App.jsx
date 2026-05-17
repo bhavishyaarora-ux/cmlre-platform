@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import axios from 'axios';
-import { Activity, Droplets, Map as MapIcon, Menu, Search, Fish, Dna, Camera, Upload, ScanLine } from 'lucide-react';
+import { Activity, Droplets, Map as MapIcon, Menu, Search, Fish, Dna, Camera, Upload, ScanLine, Radar, AlertTriangle } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from "jwt-decode";
 
 const STATIONS = [
   { id: '9414290', name: 'San Francisco, CA', lat: 37.806, lng: -122.465 },
@@ -33,7 +35,10 @@ export default function App() {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResults, setScanResults] = useState(null);
+  const [isSaved, setIsSaved] = useState(false);
   const imageRef = useRef(null);
+  const [user, setUser] = useState(null);
+  const [patrolData, setPatrolData] = useState([]);
 
   // Map Data Fetch
   useEffect(() => {
@@ -83,6 +88,14 @@ export default function App() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'patrol' && patrolData.length === 0) {
+      axios.get(`${import.meta.env.VITE_API_URL}/api/overfishing`)
+        .then(res => setPatrolData(res.data))
+        .catch(err => console.error("Error fetching patrol data:", err));
+    }
+  }, [activeTab, patrolData.length]);
+
   // Database Save
   const handleQuery = async () => {
     if (!searchQuery) return alert("Please enter a sequence first.");
@@ -109,18 +122,36 @@ export default function App() {
   };
 
   // NEW FUNCTION: Simulate AI Scan
+  // NEW FUNCTION: Simulate AI Scan with Randomized Realistic Data
   const runAIScan = () => {
     if (!uploadedImage) return;
     setIsScanning(true);
+    setIsSaved(false);
 
-    // Simulate a 2.5 second AI processing delay
+    // 1. List of real Indian coastal fish species
+    const mockSpecies = [
+      "Sardinella longiceps",
+      "Rastrelliger kanagurta (Indian Mackerel)",
+      "Epinephelus coioides (Orange-spotted Grouper)",
+      "Pampus argenteus (Silver Pomfret)",
+      "Tenualosa ilisha (Hilsa)",
+      "Lutjanus argentimaculatus (Mangrove Red Snapper)"
+    ];
+
+    // 2. Generate random stats
+    const randomSpecies = mockSpecies[Math.floor(Math.random() * mockSpecies.length)];
+    const randomConfidence = (Math.random() * (99.5 - 82.0) + 82.0).toFixed(1) + "%";
+    const randomLength = (Math.random() * (40.0 - 8.0) + 8.0).toFixed(1) + " cm";
+    const randomAge = (Math.random() * (6.0 - 0.5) + 0.5).toFixed(1) + " Years";
+
+    // 3. Simulate a 2.5 second AI processing delay, then set the random results
     setTimeout(() => {
       setIsScanning(false);
       setScanResults({
-        species: "Sardinella longiceps (Predicted)",
-        confidence: "94.2%",
-        length: "14.2 cm",
-        ageEstimate: "1.5 Years (Otolith Morphometrics)",
+        species: `${randomSpecies} (Predicted)`,
+        confidence: randomConfidence,
+        length: randomLength,
+        ageEstimate: `${randomAge} (Otolith Morphometrics)`,
         health: "Normal"
       });
     }, 2500);
@@ -147,6 +178,9 @@ export default function App() {
             <li onClick={() => setActiveTab('lab')} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${activeTab === 'lab' ? 'bg-slate-700 text-cyan-400 shadow-md' : 'hover:bg-slate-700/50'}`}>
               <Camera size={20} /> Image AI Lab
             </li>
+            <li onClick={() => setActiveTab('patrol')} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${activeTab === 'patrol' ? 'bg-slate-700 text-rose-400 shadow-md' : 'hover:bg-slate-700/50'}`}>
+              <Radar size={20} /> Overfishing Patrol
+            </li>
           </ul>
         </nav>
       </div>
@@ -158,11 +192,30 @@ export default function App() {
             {activeTab === 'map' ? 'Live Oceanographic Telemetry' : activeTab === 'taxonomy' ? 'Marine Species Database' : 'Computer Vision & Otolith Lab'}
           </h2>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-2 text-sm text-slate-400">
-              <span className={`w-2 h-2 rounded-full ${activeTab === 'lab' ? 'bg-purple-500' : 'bg-emerald-500'} animate-pulse`}></span>
-              {activeTab === 'lab' ? 'YOLOv8 Model Active' : 'Database Connected'}
-            </span>
-            <Menu className="cursor-pointer text-slate-400 hover:text-white" />
+
+            {/* GOOGLE LOGIN LOGIC */}
+            {!user ? (
+              <GoogleLogin
+                onSuccess={(credentialResponse) => {
+                  const decodedToken = jwtDecode(credentialResponse.credential);
+                  setUser(decodedToken);
+                  console.log("Logged in User:", decodedToken);
+                }}
+                onError={() => {
+                  console.log('Login Failed');
+                }}
+                theme="filled_black"
+                shape="pill"
+              />
+            ) : (
+              <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-full border border-slate-700">
+                <img src={user.picture} alt="Profile" className="w-8 h-8 rounded-full" />
+                <span className="text-sm font-medium text-slate-200">Hello, {user.given_name}</span>
+                <button onClick={() => setUser(null)} className="text-xs text-rose-400 hover:text-rose-300 ml-2">Logout</button>
+              </div>
+            )}
+
+            <Menu className="cursor-pointer text-slate-400 hover:text-white ml-4" />
           </div>
         </header>
 
@@ -371,6 +424,63 @@ export default function App() {
                     </div>
                   )}
                 </div>
+              </div>
+
+            </div>
+          )}
+          {/* NEW: OVERFISHING PATROL VIEW */}
+          {activeTab === 'patrol' && (
+            <div className="p-8 grid grid-cols-3 gap-8 h-full">
+
+              {/* Left Column: Alerts */}
+              <div className="col-span-1 space-y-6 overflow-y-auto pr-4">
+                <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                  <h3 className="text-lg font-medium text-slate-300">Active Fleet Alerts</h3>
+                  <span className="bg-rose-500/20 text-rose-400 text-xs px-2 py-1 rounded font-bold animate-pulse">LIVE</span>
+                </div>
+
+                {patrolData.map((zone) => (
+                  <div key={zone.id} className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden">
+                    <div className={`absolute left-0 top-0 w-1 h-full`} style={{ backgroundColor: zone.color }}></div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-lg text-slate-200">{zone.name}</h4>
+                      <AlertTriangle size={18} style={{ color: zone.color }} />
+                    </div>
+                    <p className="text-slate-400 text-sm mb-3">Detected unauthorized vessel cluster.</p>
+                    <div className="flex justify-between items-end bg-slate-900 p-3 rounded border border-slate-700">
+                      <div>
+                        <span className="text-slate-500 text-xs block">Vessel Count</span>
+                        <span className="text-xl font-mono text-slate-200">{zone.vessels}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-500 text-xs block">Risk Level</span>
+                        <span className="font-bold text-sm tracking-wide" style={{ color: zone.color }}>{zone.risk.toUpperCase()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Right Column: Map focused on India */}
+              <div className="col-span-2 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl relative z-0">
+                <MapContainer center={[15.0, 78.0]} zoom={5} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+                  {patrolData.map((zone) => (
+                    <Circle
+                      key={zone.id}
+                      center={[zone.lat, zone.lng]}
+                      pathOptions={{ color: zone.color, fillColor: zone.color, fillOpacity: 0.4 }}
+                      radius={zone.radius}
+                    >
+                      <Popup>
+                        <div className="text-slate-900 font-bold text-center">
+                          {zone.name}<br />
+                          <span className="text-rose-600">{zone.vessels} Unauthorized Vessels</span>
+                        </div>
+                      </Popup>
+                    </Circle>
+                  ))}
+                </MapContainer>
               </div>
 
             </div>

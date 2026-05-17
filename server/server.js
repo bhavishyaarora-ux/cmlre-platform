@@ -95,6 +95,16 @@ app.post("/api/edna/analyze", async (req, res) => {
     res.status(500).json({ error: "Failed to analyze sequence" });
   }
 });
+// Route E: Overfishing Detection Zones (Mock Data for India)
+app.get('/api/overfishing', (req, res) => {
+  const overfishingZones = [
+    { id: 'Z-101', name: 'Arabian Sea (Kochi Coast)', lat: 10.15, lng: 75.50, risk: 'Critical', vessels: 42, radius: 40000, color: '#ef4444' }, // Red
+    { id: 'Z-102', name: 'Gulf of Mannar', lat: 8.80, lng: 78.80, risk: 'High', vessels: 28, radius: 30000, color: '#f97316' }, // Orange
+    { id: 'Z-103', name: 'Bay of Bengal (Odisha Coast)', lat: 19.50, lng: 86.50, risk: 'Critical', vessels: 55, radius: 45000, color: '#ef4444' },
+    { id: 'Z-104', name: 'Gujarat Coast', lat: 21.00, lng: 69.50, risk: 'Moderate', vessels: 15, radius: 25000, color: '#eab308' } // Yellow
+  ];
+  res.json(overfishingZones);
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
